@@ -1,0 +1,52 @@
+```css
+.member-dropdown {
+    position: relative;
+    margin-top: 10px;
+}
+
+.member-option {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    cursor: pointer;
+    background: #ffffff;
+    border-left: 4px solid #2196F3;
+    margin: 8px 0;
+    padding: 12px 15px;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.toggle-arrow {
+    transition: transform 0.3s ease;
+}
+
+.toggle-arrow.active {
+    transform: rotate(180deg);
+}
+
+.member-submenu {
+    padding: 10px 0;
+    background: #ffffff;
+    border-radius: 4px;
+}
+
+.submenu-item {
+    padding: 8px 15px 8px 30px;
+    cursor: pointer;
+    color: #333;
+    transition: background-color 0.2s ease;
+    background: #ffffff;
+    border-left: 4px solid #3f51b5;
+    margin: 8px 15px;
+    padding: 10px 15px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.submenu-item:hover {
+    background: #f4f5fd;
+    color: #3f51b5;
+}
+```

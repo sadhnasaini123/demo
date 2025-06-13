@@ -1,5 +1,5 @@
 <?php
-require_once $_SERVER['DOCUMENT_ROOT'] . '/mlm-system/includes/functions.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/mlm/includes/functions.php';
 
 session_start();
 
@@ -9,7 +9,6 @@ function isLoggedIn() {
 
 function login($email, $password) {
     global $pdo;
-    
     $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
     $stmt->execute([$email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
