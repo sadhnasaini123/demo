@@ -1,164 +1,267 @@
 <?php
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/vendor/autoload.php';
 
+session_start();
+
+// Check if user is already logged in
 if (isLoggedIn()) {
-    header('Location: dashboard.php');
+    header('Location: user-information/user-dashboard.php');
     exit;
 }
 
 $error = '';
+$success = '';
+
+// Check for success message from registration
+if (isset($_SESSION['success'])) {
+    $success = $_SESSION['success'];
+    unset($_SESSION['success']);
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim($_POST['email']);
-    $password = trim($_POST['password']);
-    
-    if (empty($email) || empty($password)) {
-        $error = 'Both email and password are required';
+    // Check if it's a Google login
+    if (isset($_POST['credential'])) {
+        $credential = $_POST['credential'];
+        try {
+            $parts = explode('.', $credential);
+            if (count($parts) !== 3) {
+                throw new Exception('Invalid JWT: Incorrect number of parts');
+            }
+            
+            $payload = json_decode(base64_decode(str_replace(['-', '_'], ['+', '/'], $parts[1])), true);
+
+            if ($payload === null && json_last_error() !== JSON_ERROR_NONE) {
+                throw new Exception('JWT Payload is not valid JSON: ' . json_last_error_msg());
+            }
+
+            $email = $payload['email'];
+            
+            // Find user by email
+            $user = getUserByEmail($email);
+            
+            if ($user) {
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['account_id'] = $user['account_id'];
+                $_SESSION['username'] = $user['username'];
+                
+                header('Location: user-information/user-dashboard.php');
+                exit;
+            } else {
+                $error = 'No account found with this email. Please sign up first.';
+            }
+        } catch (Exception $e) {
+            $error = 'Google Sign-In failed: ' . $e->getMessage();
+        }
     } else {
-        if (login($email, $password)) {
-            $_SESSION['user_email'] = $email;
-            header('Location: dashboard.php');
-            exit;
+        // Regular form login
+        $accountId = trim($_POST['account_id'] ?? '');
+        $password = trim($_POST['password'] ?? '');
+
+        // Validate inputs
+        if (empty($accountId) || empty($password)) {
+            $error = 'Both fields are required';
         } else {
-            $error = 'Invalid email or password';
+            // Attempt login
+            $user = loginUser($accountId, $password);
+            
+            if ($user) {
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['account_id'] = $user['account_id'];
+                $_SESSION['username'] = $user['username'];
+                
+                header('Location: user-information/user-dashboard.php');
+                exit;
+            } else {
+                $error = 'Invalid account ID or password';
+            }
         }
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login</title>
-  <style>
-    * {
-      box-sizing: border-box;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <script src="https://accounts.google.com/gsi/client"></script>
+    <style>
+        :root {
+            --primary: #5a55ae;
+            --danger: #dc3545;
+            --success: #28a745;
+            --background: #f3f4f8;
+            --card-bg: #ffffff;
+            --text-dark: #2e2e2e;
+            --border: #ddd;
+        }
 
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', sans-serif;
-      background-image:url('images/background.jpg');
-      background-size: cover;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-    }
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background-image: url('images/background.jpg');
+            background-size: cover;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
 
-    .container {
-      /* background: white; */
-      padding: 40px 30px;
-      border-radius: 15px;
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
-      max-width: 400px;
-      width: 100%;
-    }
+        .container {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+            max-width: 420px;
+            width: 100%;
+        }
 
-    h1 {
-      margin-bottom: 20px;
-      text-align: center;
-      font-size: 28px;
-      color:white;
-    }
+        h1 {
+            margin-bottom: 20px;
+            text-align: center;
+            color: white;
+        }
 
-    .form-group {
-      margin-bottom: 20px;
-    }
+        .alert {
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+        }
 
-    label {
-      display: block;
-      margin-bottom: 8px;
-      font-weight: bold;
-      font-size: 14px;
-      color:white;
-    }
+        .alert.error {
+            background: var(--danger);
+            color: #fff;
+        }
 
-    input {
-      width: 100%;
-      padding: 12px;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-      font-size: 14px;
-      background-color: transparent;
-      color: white;
-    }
+        .alert.success {
+            background: var(--success);
+            color: #fff;
+        }
 
-    .btn {
-      width: 100%;
-      padding: 12px;
-      background-color:rgb(26, 65, 61);
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
+        .form-group {
+            margin-bottom: 20px;
+        }
 
-    .btn:hover {
-      background-color:rgb(26, 65, 61);
-      font-size:larger;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            color: white;
+        }
 
-    .alert.error {
-      background: #ffe0e0;
-      color: #b10000;
-      padding: 10px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      font-size: 14px;
-    }
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            transition: border 0.3s;
+            color: white;
+        }
 
-    p {
-      text-align: center;
-      margin-top: 20px;
-      font-size: 14px;
-    }
+        input:focus {
+            border-color: var(--primary);
+            outline: none;
+            background: rgba(255, 255, 255, 0.2);
+        }
 
-    a {
-      color: #007bff;
-      text-decoration: none;
-      font-weight: bold;
-    }
+        .btn {
+            background: rgb(26, 65, 61);
+            color: white;
+            padding: 12px;
+            border: none;
+            width: 100%;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
 
-    a:hover {
-      text-decoration: underline;
-    }
+        .btn:hover {
+            background: rgb(20, 50, 45);
+            transform: scale(1.02);
+        }
 
-    @media (max-width: 480px) {
-      .container {
-        padding: 30px 20px;
-      }
-    }
-  </style>
+        p {
+            text-align: center;
+            margin-top: 15px;
+            color: white;
+        }
+
+        a {
+            color: #4fc3f7;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 500px) {
+            .container {
+                padding: 30px 20px;
+            }
+        }
+
+        #buttonDiv {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Login</h1>
+    <div class="container">
+        <h1>Login to Your Account</h1>
 
-    <?php if ($error): ?>
-      <div class="alert error"><?php echo htmlspecialchars($error); ?></div>
-    <?php endif; ?>
+        <?php if ($error): ?>
+            <div class="alert error"><?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
 
-    <form action="login.php" method="post">
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input type="email" id="email" name="email" required>
-      </div>
+        <?php if ($success): ?>
+            <div class="alert success"><?= htmlspecialchars($success) ?></div>
+        <?php endif; ?>
 
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input type="password" id="password" name="password" required>
-      </div>
+        <form action="login.php" method="post" autocomplete="off">
+            <div class="form-group">
+                <label for="account_id">Account ID</label>
+                <input type="text" id="account_id" name="account_id" value="<?= htmlspecialchars($_POST['account_id'] ?? '') ?>" required>
+            </div>
 
-      <button type="submit" class="btn">Login</button>
-    </form>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
 
-    <p style="color:white;">Don't have an account? <a href="signup.php">Sign Up</a></p>
-  </div>
+            <button type="submit" class="btn">Login</button>
+        </form>
+
+        <div id="buttonDiv"></div>
+
+        <p>Don't have an account? <a href="signup.php">Sign up here</a></p>
+        <!-- <p>Forgot your password? <a href="forgot_password.php">Reset it here</a></p> -->
+    </div>
+
+    <script>
+ 
+
+        function handleCredentialResponse(response) {
+            // Create a hidden form and submit it
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = 'login.php';
+            
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'credential';
+            input.value = response.credential;
+            
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
+        }
+    </script>
 </body>
 </html>

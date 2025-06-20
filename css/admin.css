@@ -1,0 +1,35 @@
+.status-toggle {
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.status-toggle.active {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.status-toggle.inactive {
+    background-color: #f44336;
+    color: white;
+}
+
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px;
+    border-radius: 4px;
+    color: white;
+    z-index: 1000;
+}
+
+.notification.success {
+    background-color: #4CAF50;
+}
+
+.notification.error {
+    background-color: #f44336;
+}

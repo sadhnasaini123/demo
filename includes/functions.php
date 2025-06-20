@@ -102,17 +102,70 @@ function getReferralsByUserId($userId) {
     $stmt->execute([$userId]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
-
-
 function getAllUsers() {
+    global $pdo; // Assuming you're using PDO
+    
+     $stmt = $pdo->prepare("
+        SELECT u.*, 
+               ref.username as referrer_username,
+               ref.id as referrer_id 
+        FROM users u 
+        LEFT JOIN users ref ON ref.id = u.referred_by 
+    ");
+    $stmt->execute();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+function getAllactiveUser() {
     global $pdo;
-    $stmt = $pdo->query("SELECT * FROM users ORDER BY id ASC");
+    // $stmt = $pdo->prepare("SELECT * FROM users WHERE status = 'active'");
+     $stmt = $pdo->prepare("
+        SELECT u.*, 
+               ref.username as referrer_username,
+               ref.id as referrer_id 
+        FROM users u 
+        LEFT JOIN users ref ON ref.id = u.referred_by 
+         WHERE u.status = 'active'
+        
+    ");
+    $stmt->execute();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function getAllInactiveuser() {
+    global $pdo;
+    $stmt = $pdo->prepare("
+        SELECT u.*, 
+               ref.username as referrer_username,
+               ref.id as referrer_id 
+        FROM users u 
+        LEFT JOIN users ref ON ref.id = u.referred_by 
+        WHERE u.status = 'inactive'
+    ");
+    $stmt->execute();
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 function updateUserStatus($userId, $status) {
     global $pdo;
-    $stmt = $pdo->prepare("UPDATE users SET status = ? WHERE id = ?");
-    return $stmt->execute([$status, $userId]);
+    
+    try {
+        // Update the status directly
+        $stmt = $pdo->prepare("UPDATE users SET status = ? WHERE id = ?");
+        $success = $stmt->execute([$status, $userId]);
+        
+        if ($success) {
+            return [
+                'success' => true,
+                'new_status' => $status,
+                'button_text' => ($status === 'active') ? 'Deactivate' : 'Activate',
+                'message' => 'User status updated successfully'
+            ];
+        } else {
+            return ['success' => false, 'message' => 'Failed to update status'];
+        }
+    } catch (PDOException $e) {
+        error_log("Error updating user status: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Database error occurred'];
+    }
 }
 ?>

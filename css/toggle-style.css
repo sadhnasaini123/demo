@@ -1,0 +1,56 @@
+.toggle-button {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    background: #fff;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+}
+
+.toggle-button:hover {
+    background: #f0f0f0;
+}
+
+.toggle-icon {
+    display: block;
+    width: 25px;
+    height: 3px;
+    background: #333;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.toggle-icon::before,
+.toggle-icon::after {
+    content: '';
+    position: absolute;
+    width: 25px;
+    height: 3px;
+    background: #333;
+    transition: all 0.3s ease;
+}
+
+.toggle-icon::before {
+    top: -8px;
+}
+
+.toggle-icon::after {
+    bottom: -8px;
+}
+
+.toggle-button.active .toggle-icon {
+    background: transparent;
+}
+
+.toggle-button.active .toggle-icon::before {
+    transform: translateY(8px) rotate(45deg);
+}
+
+.toggle-button.active .toggle-icon::after {
+    transform: translateY(-8px) rotate(-45deg);
+}

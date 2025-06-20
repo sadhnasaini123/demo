@@ -1,11 +1,8 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/mlm/includes/functions.php';
 
-session_start();
+// session_start();
 
-function isLoggedIn() {
-    return isset($_SESSION['user_id']);
-}
 
 function login($email, $password) {
     global $pdo;
@@ -29,46 +26,61 @@ function logout() {
     session_destroy();
 }
 
-function registerUser($username, $email, $password, $referenceCode ) {
+function registerUser($username, $email, $password, $referenceCode = null, $accountId) {
     global $pdo;
-
-    $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-    $userReferenceCode = generateReferenceCode();
-
-    $sponsorId = null; // <-- Add this line
-
+    
+    // Generate unique reference code if empty
+    if (empty($referenceCode)) {
+        $referenceCode = generateUniqueReferenceCode();
+    }
+    
     try {
-        $pdo->beginTransaction();
-
-        // Determine sponsor level
-        if ($referenceCode) {
-            $sponsor = getUserByReferenceCode($referenceCode);
-            if ($sponsor) {
-                $sponsorId = $sponsor['id'];
-            }
-        }
-
-        // Insert user with sponsor
-        $stmt = $pdo->prepare("
-            INSERT INTO users (username, email, password, reference_code, referred_by) 
-            VALUES (?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([
-            $username, 
-            $email, 
-            $hashedPassword, 
-            $userReferenceCode, 
-            $sponsorId
-        ]);
-
-        $userId = $pdo->lastInsertId();
-
-        $pdo->commit();
-        return $userId;
-    } catch (Exception $e) {
-        $pdo->rollBack();
+        $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+        $stmt = $pdo->prepare("INSERT INTO users (username, email, password, reference_code, account_id) 
+                              VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([$username, $email, $hashedPassword, $referenceCode, $accountId]);
+        return $pdo->lastInsertId();
+    } catch (PDOException $e) {
+        error_log("Registration error: " . $e->getMessage());
         return false;
     }
+}
+
+function generateUniqueReferenceCode() {
+    global $pdo;
+    $code = '';
+    $exists = true;
+    
+    // Keep generating until we get a unique code
+    while ($exists) {
+        $code = 'REF' . strtoupper(substr(md5(uniqid(rand(), true)), 0, 7));
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE reference_code = ?");
+        $stmt->execute([$code]);
+        $exists = (bool)$stmt->fetch();
+    }
+    
+    return $code;
+}
+// Helper functions
+function generateAccountId() {
+    // Example: Generate a consistent unique ID
+    return 'MLM' . strtoupper(substr(md5(uniqid(mt_rand(), true)), 0, 8));
+    
+    // Or if you want sequential IDs:
+    // $lastId = getLastUserIdFromDatabase(); // Implement this
+    // return 'MLM' . str_pad($lastId + 1, 6, '0', STR_PAD_LEFT);
+}
+function emailExists($email) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+    $stmt->execute([$email]);
+    return $stmt->fetch() !== false;
+}
+
+function updateDownlineCount($userId) {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE users SET downline_count = downline_count + 1 WHERE id = ?");
+    $stmt->execute([$userId]);
 }
 
 function isAdmin() {
@@ -78,3 +90,41 @@ function isAdmin() {
     return $_SESSION['user_email'] === 'sadhnasaini085@gmail.com';
 }
 ?>
+<?php
+require_once __DIR__ . '/config.php';
+// includes/auth.php
+
+function loginUser($accountId, $password) {
+    global $pdo;
+    
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE account_id = ?");
+        $stmt->execute([$accountId]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($user && password_verify($password, $user['password'])) {
+            return $user;
+        }
+        return false;
+    } catch (PDOException $e) {
+        error_log("Login error: " . $e->getMessage());
+        return false;
+    }
+}
+
+function isLoggedIn() {
+    return isset($_SESSION['user_id']);
+}
+
+function getUserByEmail($email) {
+    global $pdo;
+    
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Get user by email error: " . $e->getMessage());
+        return false;
+    }
+}

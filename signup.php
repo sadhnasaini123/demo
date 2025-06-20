@@ -1,6 +1,10 @@
 <?php
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/vendor/autoload.php';
 
+// session_start();
+
+// Check if user is already logged in
 if (isLoggedIn()) {
     header('Location: dashboard.php');
     exit;
@@ -16,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $confirmPassword = trim($_POST['confirm_password']);
     $referenceCode = isset($_POST['reference_code']) ? trim($_POST['reference_code']) : null;
 
+    // Validate inputs
     if (empty($username) || empty($email) || empty($password) || empty($confirmPassword)) {
         $error = 'All fields are required';
     } elseif ($password !== $confirmPassword) {
@@ -23,6 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (strlen($password) < 6) {
         $error = 'Password must be at least 6 characters';
     } else {
+        // Check reference code if provided
         if ($referenceCode) {
             $sponsor = getUserByReferenceCode($referenceCode);
             if (!$sponsor) {
@@ -30,12 +36,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        if (!$error) {
-            $userId = registerUser($username, $email, $password, $referenceCode);
-            if ($userId) {
-                $success = 'Registration successful. You can now login.';
-                header('Location: login.php');
-                exit;
+       if (!$error) {
+    // Generate account ID once and reuse it
+    $accountId = generateAccountId();
+    
+    // Register user with this account ID
+    $userId = registerUser($username, $email, $password, $referenceCode, $accountId);
+    
+    if ($userId) {
+        $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+                try {
+                    // SMTP Configuration for Gmail
+                    $mail->isSMTP();
+                    $mail->Host = 'smtp.gmail.com';
+                    $mail->SMTPAuth = true;
+                    $mail->Username = 'sadhnasaini2004@gmail.com';
+                    $mail->Password = 'vvej veyk eybl nyve';
+                    $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+                    $mail->Port = 587;
+
+                    // Email Content Setup
+                    $mail->setFrom('sadhnasaini2004@gmail.com', 'MLM Software');
+                    
+                    // Send to admin
+                    $mail->addAddress('sadhnasaini2004@gmail.com');
+                    
+                    // Also send to user
+                    $mail->addAddress($email);
+                    
+                    $mail->isHTML(true);
+                    $mail->Subject = 'New User Registration: ' . $username;
+                    
+                    // HTML Email Body
+                    $mail->Body = "
+                        <h2 style='color: #0066cc;'>New User Registration</h2>
+                        <p>A new user has registered with the following details:</p>
+                        
+                        <table style='width: 100%; border-collapse: collapse;'>
+                            <tr>
+                                <td style='padding: 8px; border: 1px solid #ddd;'><strong>Account ID:</strong></td>
+                                <td style='padding: 8px; border: 1px solid #ddd;'>$accountId</td>
+                            </tr>
+                            <tr>
+                                <td style='padding: 8px; border: 1px solid #ddd;'><strong>Username:</strong></td>
+                                <td style='padding: 8px; border: 1px solid #ddd;'>$username</td>
+                            </tr>
+                            <tr>
+                                <td style='padding: 8px; border: 1px solid #ddd;'><strong>Email:</strong></td>
+                                <td style='padding: 8px; border: 1px solid #ddd;'>$email</td>
+                            </tr>
+                             <tr>
+                                <td style='padding: 8px; border: 1px solid #ddd;'><strong>Password</strong></td>
+                                <td style='padding: 8px; border: 1px solid #ddd;'>$password</td>
+                            </tr>
+            
+                            <tr>
+                                <td style='padding: 8px; border: 1px solid #ddd;'><strong>Registration Date:</strong></td>
+                                <td style='padding: 8px; border: 1px solid #ddd;'>" . date('Y-m-d H:i:s') . "</td>
+                            </tr>
+                        </table>
+                    ";
+                    
+                    // Plain text version
+                    $mail->AltBody = "New User Registration\n\n"
+                                   . "Account ID: $accountId\n"
+                                   . "Username: $username\n"
+                                   . "Email: $email\n"
+                                   . "Reference Code: " . ($referenceCode ? $referenceCode : 'None') . "\n"
+                                   . "Registration Date: " . date('Y-m-d H:i:s');
+
+                    if ($mail->send()) {
+                        $_SESSION['success'] = 'Registration successful! Details have been sent to admin.';
+                        header('Location: login.php');
+                        exit;
+                    } else {
+                        $_SESSION['error'] = 'Account created but email could not be sent.';
+                    }
+                } catch (Exception $e) {
+                    $_SESSION['error'] = "Mailer Error: " . $e->getMessage();
+                }
             } else {
                 $error = 'Registration failed. Please try again.';
             }
@@ -43,7 +122,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -198,7 +276,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
 
             <div class="form-group">
-                <label for="password">Password (Min. 6 characters)</label>
+                <label for="password">Password</label>
                 <input type="password" id="password" name="password" required>
             </div>
 
@@ -213,19 +291,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
 
             <button type="submit" class="btn">Register</button>
-             <div id="g_id_onload"
-         data-client_id="YOUR_GOOGLE_CLIENT_ID"
-         data-login_uri="signup.php"
-         data-auto_prompt="false">
-  </div>
-  <div class="g_id_signin"
-         data-type="standard"
-         data-size="large"
-         data-theme="outline"
-         data-text="sign_up_with"
-         data-shape="rectangular"
-         data-logo_alignment="left">
-  </div>
         </form>
 
         <p style="color:white;">Already registered? <a href="login.php">Login here</a></p>
