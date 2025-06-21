@@ -327,10 +327,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         console.log('Server response:', data);
         // Handle server response (e.g., display success/error message)
          if (data.includes('Registration successful')) {
-                    window.location.href = 'login.php'; // Redirect to login page on success
-                } else {
-                    alert(data); // Show error message
-                }
+            window.location.href = 'login.php'; // Redirect to login page on success
+        } else {
+            alert(data); // Show error message
+        }
       })
       .catch((error) => {
         console.error('Error:', error);
